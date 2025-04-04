@@ -25,10 +25,28 @@ def step(points, pc_labels, class_labels, model):
     """
     
     # TODO : Implement step function for segmentation.
+    # 1) Move data to device
+    points, pc_labels, class_labels = points.to(device), pc_labels.to(device), class_labels.to(device)
 
-    loss = None
-    logits = None
-    preds = None
+    # 2) Forward pass through the segmentation model
+    logits, trans_input, trans_feat = model(points)  # [B, m, N]
+
+    # Flatten for cross-entropy:
+    B, m, N = logits.shape  # e.g. [B, 50, N]
+    logits_2d = logits.transpose(1, 2).reshape(B*N, m)    # => [B*N, 50]
+    pc_labels_1d = pc_labels.reshape(-1)                  # => [B*N]
+
+    # 3) Compute cross-entropy loss for per-point classification
+    loss_ce = F.cross_entropy(logits_2d, pc_labels_1d)
+
+    # 4) Orthogonal regularization
+    loss_reg1 = get_orthogonal_loss(trans_input)
+    loss_reg2 = get_orthogonal_loss(trans_feat)
+    loss = loss_ce + loss_reg1 + loss_reg2
+
+    # 5) Predictions (per-point argmax)
+    preds = torch.argmax(logits, dim=1)  # [B, N]
+
     return loss, logits, preds
 
 
@@ -39,6 +57,10 @@ def train_step(points, pc_labels, class_labels, model, optimizer, train_acc_metr
     train_batch_acc = train_acc_metric(preds, pc_labels.to(device))
 
     # TODO : Implement backpropagation using optimizer and loss
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
     return loss, train_batch_acc
 
@@ -156,8 +178,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PointNet ShapeNet Part Segmentation")
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
 
     args = parser.parse_args()

@@ -21,9 +21,18 @@ def step(points, labels, model):
     
     # TODO : Implement step function for classification.
 
-    loss = None
-    preds = None
-    return loss, preds
+    points, labels = points.to(device), labels.to(device)
+    logits, trans_input, trans_feat = model(points)
+
+    # e.g. cross entropy loss
+    loss_cls = F.cross_entropy(logits, labels)
+    # optional orthogonal losses
+    loss_reg1 = get_orthogonal_loss(trans_input)
+    loss_reg2 = get_orthogonal_loss(trans_feat)
+    total_loss = loss_cls + loss_reg1 + loss_reg2
+
+    preds = torch.argmax(logits, dim=1)
+    return total_loss, preds
 
 
 def train_step(points, labels, model, optimizer, train_acc_metric):
@@ -31,6 +40,11 @@ def train_step(points, labels, model, optimizer, train_acc_metric):
     train_batch_acc = train_acc_metric(preds, labels.to(device))
 
     # TODO : Implement backpropagation using optimizer and loss
+
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
     return loss, train_batch_acc
 
@@ -140,8 +154,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PointNet ModelNet40 Classification")
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
 
     args = parser.parse_args()

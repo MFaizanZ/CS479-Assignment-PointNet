@@ -23,9 +23,17 @@ def step(points, model):
     # TODO : Implement step function for AutoEncoder. 
     # Hint : Use chamferDist defined in above
     # Hint : You can compute chamfer distance between two point cloud pc1 and pc2 by chamfer_distance(pc1, pc2)
-    
-    preds = None
-    loss = None
+
+    # Move points to device
+    points = points.to(device)
+
+    # Forward pass
+    preds = model(points)  # [B, N, 3]
+
+    # Compute Chamfer Distance
+    # chamfer_distance returns (cd, _) => cd is the average distance
+    cd, _ = chamfer_distance(preds, points)
+    loss = cd
 
     return loss, preds
 
@@ -34,6 +42,13 @@ def train_step(points, model, optimizer):
     loss, preds = step(points, model)
 
     # TODO : Implement backpropagation using optimizer and loss
+
+    loss, preds = step(points, model)
+
+    # Backprop
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
     return loss, preds
 
@@ -118,8 +133,8 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PointNet ModelNet40 AutoEncoder")
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--epochs", type=int, default=40)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=1e-3)
 
     args = parser.parse_args()
